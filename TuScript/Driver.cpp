@@ -8,78 +8,71 @@
 The main idea here is to make a "stacker":
 
 A simple instruction interpreter that only deals
-with basic arithmetic
+with basic integer arithmetic
 
 */
 
-/* Not yet in use */
-std::vector<std::function<int()>> opstack;
+static std::vector<int> numstack;
+static std::vector<std::function<int( int, int )>> opstack;
+
+auto TuAdd = [=]( int arg1, int arg2 ) -> int {
+	return arg1 + arg2;
+};
+
+auto TuSub = [=]( int arg1, int arg2 ) -> int {
+	return arg1 - arg2;
+};
+
+auto TuMult = [=]( int arg1, int arg2 ) -> int {
+	return arg1 * arg2;
+};
+
+auto TuDiv = [=]( int arg1, int arg2 ) -> int {
+	return arg1 / arg2;
+};
 
 int InterpretComm ( char **args, int length );
-int UtoI ( const std::string& data );
 
 int main ( int argc, char *argv[] ) {
-
-
-	auto PrintArgs = [&]() -> void {
-		for ( size_t i = 0; i < argc; ++i ) {
-			std::printf( "argv[%d] = %s\n", i, argv[i] );
-		}
-	};
-
-	PrintArgs();
-
-	std::printf( "Result: %d", InterpretComm( ++argv, argc - 1 ) );
-
+	std::printf( "Result: %d\n", InterpretComm( ++argv, --argc ) );
 	return 0;
 }
 
-/* This function will be recursive, and will handle a variable length arithmetic operation */
-int InterpretComm ( char **args, int length ) {
-	/* Define some basic arithmetic operations using lambda functions */
-	auto add = [=]( int arg1, int arg2 ) -> int {
-		return arg1 + arg2;
-	};
-
-	auto sub = [=]( int arg1, int arg2 ) -> int {
-		return arg1 - arg2;
-	};
-
-	auto mult = [=]( int arg1, int arg2 ) -> int {
-		return arg1 * arg2;
-	};
-
-	auto div = [=]( int arg1, int arg2 ) -> int {
-		return arg1 / arg2;
-	};
-
-	/* If the args array is empty... */
-	//if ( !length ) {
-	//return 0;
-	//}
-
-	for ( size_t i = 1; i < length; ++i ) {
-		if ( args[i] == "+" ) {
-			std::printf( "adding..." );
-			return add( UtoI( args[0] ), InterpretComm( ++args, length - 1 ) );
-		} else if ( args[i] == "-" ) {
-			std::printf( "subtracting..." );
-			return sub( UtoI( args[0] ), InterpretComm( ++args, length - 1 ) );
-		} else if ( args[i] == "*" ) {
-			std::printf( "multiplying..." );
-			return mult( UtoI( args[0] ), InterpretComm( ++args, length - 1 ) );
-		} else if ( args[i] == "/" ) {
-			std::printf( "dividing..." );
-			return div( UtoI( args[0] ), InterpretComm( ++args, length - 1 ) );
-		}
-	}
+int PopNum () {
+	if ( numstack.empty() ) return 0;
+	int val = numstack.back();
+	numstack.pop_back();
+	return val;
 }
 
-int UtoI ( const std::string& data ) {
-	int val = 0, pv = 1;
-	for ( size_t i = data.length() - 1; i >= 0; --i, pv *= 10 ) {
-		val += ( data[i] - '0' ) * pv;
+std::function<int( int, int )> PopOp () {
+	std::function<int( int, int )> func = opstack.back();
+	opstack.pop_back();
+	return func;
+}
+
+int InterpretComm ( char **args, int length ) {
+	for ( size_t i = 0; i < length; ++i ) {
+		if ( !strcmp( args[i], "+" ) ) {
+			opstack.push_back( TuAdd );
+		} else if ( !strcmp( args[i], "-" ) ) {
+			opstack.push_back( TuSub );
+		} else if ( !strcmp( args[i], "*" ) ) {
+			numstack.push_back( TuMult( PopNum(), atoi( args[i++ + 1] ) ) );
+		} else if ( !strcmp( args[i], "/" ) ) {
+			numstack.push_back( TuDiv( PopNum(), atoi( args[i++ + 1] ) ) );
+		} else { /* args[0] is a number */
+			numstack.push_back( atoi( args[i] ) );
+		}
 	}
-	std::printf( "Val: %d", val );
-	return val;
+
+	int result;
+	while ( !opstack.empty() ) {
+		int arg2 = PopNum();
+		int arg1 = PopNum();
+		numstack.push_back( PopOp()( arg1, arg2 ) );
+	}
+	result = PopNum();
+
+	return result;
 }
